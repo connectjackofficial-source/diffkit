@@ -49,6 +49,50 @@ def parse_unified(text: str) -> dict:
     return {"old": old_name, "new": new_name, "hunks": hunks}
 
 
+def render_unified(ops, old_name: str = "a", new_name: str = "b",
+                   context: int = 3) -> str:
+    """Render diff ops (from :func:`diffkit.lcs.diff_lines`) as unified text.
+
+    Groups change runs with surrounding context lines into hunks; a
+    pure insertion at the top of the file becomes ``@@ -0,0 +1,k @@``.
+    """
+    seq = []
+    old_no = new_no = 0
+    for op in ops:
+        if op["op"] == "eq":
+            old_no += 1
+            new_no += 1
+            seq.append((" ", op["line"], old_no, new_no))
+        elif op["op"] == "del":
+            old_no += 1
+            seq.append(("-", op["line"], old_no, None))
+        else:
+            new_no += 1
+            seq.append(("+", op["line"], None, new_no))
+
+    out = [f"--- {old_name}", f"+++ {new_name}"]
+    i, n = 0, len(seq)
+    while i < n:
+        if seq[i][0] not in ("+", "-"):
+            i += 1
+            continue
+        j = i
+        while j < n and seq[j][0] in ("+", "-"):
+            j += 1
+        s = max(0, i - context)
+        e = min(n, j + context)
+        win = seq[s:e]
+        old_start = next((x[2] for x in win if x[2] is not None), 0)
+        new_start = next((x[3] for x in win if x[3] is not None), 1)
+        old_count = sum(1 for x in win if x[0] in (" ", "-"))
+        new_count = sum(1 for x in win if x[0] in (" ", "+"))
+        out.append(f"@@ -{old_start},{old_count} +{new_start},{new_count} @@")
+        for op, line, _, _ in win:
+            out.append(f"{op}{line}")
+        i = e
+    return "\n".join(out) + "\n"
+
+
 def apply_patch(old_text: str, patch_text: str) -> str:
     """Apply a unified patch to text and return the patched text.
 
