@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "diffkit"
+version = "0.1.0"
+description = "Zero-dependency binary and text diff toolkit: LCS diff, unified patches, n-gram similarity, tree comparison."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [{name = "Jack"}]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Version Control",
+    "Topic :: Utilities",
+]
+
+[project.scripts]
+diffkit = "diffkit.cli:main"
+
+[tool.setuptools]
+packages = ["diffkit"]
