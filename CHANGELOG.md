@@ -2,6 +2,14 @@
 
 All notable changes to diffkit.
 
+## 0.3.0 - 2026-10-18
+
+- `diff_linear` — Hirschberg divide-and-conquer diff: optimal edit
+  script with O(N+M) memory for large files (200-case randomized
+  optimality suite)
+- `diff_lines_ws` — line diff with whitespace normalization, original
+  line text preserved in the report
+
 ## 0.2.0 - 2026-10-16
 
 - `render_unified` — generate unified patch text from diff ops
