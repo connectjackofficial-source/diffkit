@@ -12,6 +12,10 @@ from __future__ import annotations
 _HUNK_RE = r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@"
 
 
+class PatchApplyError(ValueError):
+    """Raised when a patch cannot be applied in strict mode."""
+
+
 def parse_unified(text: str) -> dict:
     """Parse a unified diff string.
 
@@ -93,11 +97,15 @@ def render_unified(ops, old_name: str = "a", new_name: str = "b",
     return "\n".join(out) + "\n"
 
 
-def apply_patch(old_text: str, patch_text: str) -> str:
+def apply_patch(old_text: str, patch_text: str, strict: bool = False) -> str:
     """Apply a unified patch to text and return the patched text.
 
     Positions are 1-based; a hunk with old_start == 0 means a pure
     insertion at the top of the file.
+
+    With ``strict=True``, a context line that does not match the file
+    raises :class:`PatchApplyError`; in lenient mode (default) the
+    patch is applied positionally regardless.
     """
     parsed = parse_unified(patch_text)
     lines = old_text.splitlines(keepends=True)
@@ -109,10 +117,29 @@ def apply_patch(old_text: str, patch_text: str) -> str:
                 if read < len(lines) and lines[read].rstrip("\n") == ln:
                     out.append(lines[read])
                     read += 1
+                elif strict:
+                    raise PatchApplyError(
+                        f"context mismatch at hunk {hunk['old_start']}: "
+                        f"expected {ln!r}, got "
+                        f"{lines[read].rstrip(chr(10))!r}"
+                        if read < len(lines) else
+                        f"context mismatch: file ended, expected {ln!r}")
                 else:
                     out.append(ln + "\n")
             elif op == "-":
-                read += 1
+                if strict:
+                    if read < len(lines) and lines[read].rstrip("\n") == ln:
+                        read += 1
+                    else:
+                        raise PatchApplyError(
+                            f"deleted line mismatch at hunk "
+                            f"{hunk['old_start']}: expected {ln!r}, got "
+                            f"{lines[read].rstrip(chr(10))!r}"
+                            if read < len(lines) else
+                            f"deleted line mismatch: file ended, "
+                            f"expected {ln!r}")
+                else:
+                    read += 1
             else:  # "+"
                 out.append(ln + "\n")
         prefix = lines[: hunk["old_start"] - 1] if hunk["old_start"] > 1 else []

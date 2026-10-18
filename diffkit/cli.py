@@ -9,8 +9,8 @@ import argparse
 import sys
 from pathlib import Path
 
-from .lcs import diff_lines, diff_bytes
-from .unified import apply_patch, parse_unified
+from .lcs import diff_lines, diff_bytes, diff_lines_ws
+from .unified import apply_patch, parse_unified, render_unified
 from .similarity import ngram_similarity
 from .tree import tree_diff
 from .hexdump import hexdump
@@ -30,6 +30,10 @@ def _build_parser() -> argparse.ArgumentParser:
     d = sub.add_parser("diff", help="text line diff of two files")
     d.add_argument("old")
     d.add_argument("new")
+    d.add_argument("--ws", action="store_true",
+                  help="whitespace-normalized comparison")
+    d.add_argument("--stat", action="store_true",
+                  help="print hunk/added/removed statistics instead")
 
     b = sub.add_parser("bytes", help="fixed-block byte diff of two files")
     b.add_argument("old")
@@ -61,10 +65,20 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv=None) -> int:
     args = _build_parser().parse_args(argv)
     if args.cmd == "diff":
-        _print_diff(diff_lines(
-            Path(args.old).read_text(encoding="utf-8", errors="replace").splitlines(),
-            Path(args.new).read_text(encoding="utf-8", errors="replace").splitlines(),
-        ))
+        old_lines = Path(args.old).read_text(
+            encoding="utf-8", errors="replace").splitlines()
+        new_lines = Path(args.new).read_text(
+            encoding="utf-8", errors="replace").splitlines()
+        ops = diff_lines_ws(old_lines, new_lines) if args.ws \
+            else diff_lines(old_lines, new_lines)
+        if args.stat:
+            patch = render_unified(ops)
+            s = patch_stats(patch)
+            print(f"hunks:    {s['hunks']}")
+            print(f"added:    {s['added']}")
+            print(f"removed:  {s['removed']}")
+        else:
+            _print_diff(ops)
     elif args.cmd == "bytes":
         _print_diff(diff_bytes(
             Path(args.old).read_bytes(), Path(args.new).read_bytes(), args.block))
